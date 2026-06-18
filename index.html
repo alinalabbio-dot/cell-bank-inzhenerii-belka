@@ -95,7 +95,7 @@
         .from("boxes")
         .select("*")
         .eq("id", boxId)
-        .single();
+        .maybeSingle();
 
       if (boxError) {
         document.getElementById("boxTitle").textContent = "Ошибка загрузки коробки";
