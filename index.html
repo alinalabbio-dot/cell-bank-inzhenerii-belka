@@ -7,78 +7,125 @@
   <style>
     body {
       font-family: Arial, sans-serif;
+      margin: 0;
       padding: 24px;
-      background: #f6f7f9;
+      background: #f5f6f8;
+      color: #222;
     }
 
-    h1 {
-      margin-bottom: 8px;
-    }
-
-    .box-title {
-      margin-bottom: 20px;
-      color: #444;
+    .layout {
+      display: flex;
+      gap: 24px;
+      align-items: flex-start;
     }
 
     .grid {
       display: grid;
-      grid-template-columns: 40px repeat(10, 120px);
-      gap: 4px;
-      align-items: stretch;
-    }
-
-    .header, .row-label, .cell {
-      border: 1px solid #ccc;
-      background: white;
-      padding: 6px;
-      min-height: 70px;
-      font-size: 13px;
-      box-sizing: border-box;
+      grid-template-columns: 36px repeat(10, 82px);
+      gap: 3px;
     }
 
     .header, .row-label {
+      background: #e8ebf0;
       font-weight: bold;
       text-align: center;
-      background: #e9edf3;
-      min-height: 32px;
+      border: 1px solid #c6cbd3;
+      padding: 6px;
+      min-height: 24px;
     }
 
-    .cell.empty {
+    .cell {
+      border: 1px solid #b9bec7;
+      border-radius: 5px;
+      padding: 5px;
+      height: 58px;
+      box-sizing: border-box;
+      cursor: pointer;
+      font-size: 11px;
+      overflow: hidden;
+      background: white;
+    }
+
+    .cell:hover {
+      outline: 2px solid #333;
+    }
+
+    .position {
+      font-size: 10px;
+      color: #555;
+      font-weight: bold;
+    }
+
+    .line {
+      margin-top: 5px;
+      font-weight: bold;
+      line-height: 1.1;
+    }
+
+    .empty {
       background: #ffffff;
       color: #bbb;
     }
 
-    .cell.frozen {
-      background: #dcefd6;
+    .taken {
+      background: #ffe0b2 !important;
     }
 
-    .cell.taken {
-      background: #ffe0b2;
+    .UWB1289 { background: #cfe8f7; }
+    .A2780 { background: #e0e0e0; }
+    .OVCAR3 { background: #bfe6e0; }
+    .BT474CD59KO { background: #f6c5d8; }
+    .HS578 { background: #f4b183; }
+    .BT20 { background: #f4b183; }
+    .HBL100 { background: #d9c2f0; }
+    .MDAMB231 { background: #c6e0b4; }
+    .MDAMB436 { background: #a9d18e; }
+
+    .details {
+      width: 320px;
+      background: white;
+      border: 1px solid #ccd1d9;
+      border-radius: 10px;
+      padding: 18px;
+      min-height: 260px;
+      position: sticky;
+      top: 24px;
     }
 
-    .position {
-      font-weight: bold;
+    .details h2 {
+      margin-top: 0;
+      font-size: 20px;
+    }
+
+    .detail-row {
+      margin-bottom: 10px;
+    }
+
+    .label {
       font-size: 12px;
-      margin-bottom: 4px;
-      color: #555;
+      color: #666;
     }
 
-    .line {
+    .value {
       font-weight: bold;
-    }
-
-    .meta {
-      font-size: 11px;
-      margin-top: 4px;
-      color: #444;
-      white-space: pre-line;
+      margin-top: 2px;
     }
   </style>
 </head>
+
 <body>
   <h1>Банк клеточных линий</h1>
-  <div class="box-title" id="boxTitle">Загрузка...</div>
-  <div id="grid" class="grid"></div>
+  <div id="boxTitle">Загрузка...</div>
+  <br>
+
+  <div class="layout">
+    <div id="grid" class="grid"></div>
+
+    <div id="details" class="details">
+      <h2>Карточка ячейки</h2>
+      <p>Нажми на ячейку коробки, чтобы увидеть подробности.</p>
+    </div>
+  </div>
 
   <script>
     const SUPABASE_URL = "https://tiqxoskgsycmfksdzied.supabase.co";
@@ -90,6 +137,18 @@
     const rowLabels = ["A", "B", "C", "D", "E", "F", "G", "H", "J"];
     const columns = [1,2,3,4,5,6,7,8,9,10];
 
+    const lineClassMap = {
+      "UWB1.289": "UWB1289",
+      "A2780": "A2780",
+      "OVCAR3": "OVCAR3",
+      "BT-474 CD59 KO": "BT474CD59KO",
+      "HS578": "HS578",
+      "BT-20": "BT20",
+      "HBL-100": "HBL100",
+      "MDA-MB-231": "MDAMB231",
+      "MDA-MB-436": "MDAMB436"
+    };
+
     async function loadBox() {
       const { data: box, error: boxError } = await supabaseClient
         .from("boxes")
@@ -97,7 +156,7 @@
         .eq("id", boxId)
         .maybeSingle();
 
-      if (boxError) {
+      if (boxError || !box) {
         document.getElementById("boxTitle").textContent = "Ошибка загрузки коробки";
         console.error(boxError);
         return;
@@ -111,7 +170,15 @@
         .select(`
           *,
           cell_lines (
-            name
+            name,
+            species,
+            tumor_type,
+            atcc_medium,
+            lab_medium,
+            mycoplasma_status,
+            mycoplasma_test_date,
+            atcc_id,
+            notes
           )
         `)
         .eq("box_id", boxId);
@@ -143,26 +210,96 @@
         columns.forEach(col => {
           const position = `${row}${col}`;
           const cell = byPosition[position];
+          const lineName = cell?.cell_lines?.name || "";
+          const lineClass = lineClassMap[lineName] || "";
 
           const div = document.createElement("div");
-          div.className = "cell " + (cell?.status || "empty");
-
-          const lineName = cell?.cell_lines?.name || "";
+          div.className = `cell ${cell?.status || "empty"} ${lineClass}`;
 
           div.innerHTML = `
             <div class="position">${position}</div>
             <div class="line">${lineName || "пусто"}</div>
-            <div class="meta">
-              ${cell?.source_or_origin ? "Источник: " + cell.source_or_origin : ""}
-              ${cell?.frozen_by ? "\nЗаморозил: " + cell.frozen_by : ""}
-              ${cell?.frozen_date ? "\nДата: " + cell.frozen_date : ""}
-              ${cell?.passage ? "\nПассаж: " + cell.passage : ""}
-            </div>
           `;
 
+          div.addEventListener("click", () => showDetails(position, cell));
           grid.appendChild(div);
         });
       });
+    }
+
+    function showDetails(position, cell) {
+      const details = document.getElementById("details");
+
+      if (!cell || cell.status === "empty") {
+        details.innerHTML = `
+          <h2>${position}</h2>
+          <p>Пустая ячейка.</p>
+        `;
+        return;
+      }
+
+      const line = cell.cell_lines || {};
+
+      details.innerHTML = `
+        <h2>${position}</h2>
+
+        <div class="detail-row">
+          <div class="label">Клеточная линия</div>
+          <div class="value">${line.name || "—"}</div>
+        </div>
+
+        <div class="detail-row">
+          <div class="label">Статус ячейки</div>
+          <div class="value">${cell.status || "—"}</div>
+        </div>
+
+        <div class="detail-row">
+          <div class="label">Источник</div>
+          <div class="value">${cell.source_or_origin || "—"}</div>
+        </div>
+
+        <div class="detail-row">
+          <div class="label">Кто заморозил</div>
+          <div class="value">${cell.frozen_by || "—"}</div>
+        </div>
+
+        <div class="detail-row">
+          <div class="label">Дата заморозки</div>
+          <div class="value">${cell.frozen_date || "—"}</div>
+        </div>
+
+        <div class="detail-row">
+          <div class="label">Пассаж</div>
+          <div class="value">${cell.passage || "—"}</div>
+        </div>
+
+        <hr>
+
+        <div class="detail-row">
+          <div class="label">Тип</div>
+          <div class="value">${line.tumor_type || "—"}</div>
+        </div>
+
+        <div class="detail-row">
+          <div class="label">Среда ATCC</div>
+          <div class="value">${line.atcc_medium || "—"}</div>
+        </div>
+
+        <div class="detail-row">
+          <div class="label">Фактическая среда</div>
+          <div class="value">${line.lab_medium || "—"}</div>
+        </div>
+
+        <div class="detail-row">
+          <div class="label">Микоплазма</div>
+          <div class="value">${line.mycoplasma_status || "—"}</div>
+        </div>
+
+        <div class="detail-row">
+          <div class="label">Примечания</div>
+          <div class="value">${cell.notes || line.notes || "—"}</div>
+        </div>
+      `;
     }
 
     function makeHeader(text) {
