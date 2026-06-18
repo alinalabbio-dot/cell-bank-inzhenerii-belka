@@ -90,6 +90,12 @@
       color: #a00000;
     }
 
+.warning-icon {
+  color: #d00000;
+  font-size: 12px;
+  font-weight: bold;
+  float: right;
+}
     .warning-banner {
       background: #ffe5e5;
       color: #a00000;
@@ -254,10 +260,13 @@
           const div = document.createElement("div");
           div.className = `cell ${cell?.status || "empty"} ${lineClass} ${warning ? "mycoplasma-warning" : ""}`;
 
-          div.innerHTML = `
-            <div class="position">${position}</div>
-            <div class="line">${warning ? "❗ " : ""}${lineName || "пусто"}</div>
-          `;
+         div.innerHTML = `
+  <div class="position">
+    ${position}
+    ${warning ? '<span class="warning-icon">⚠</span>' : ''}
+  </div>
+  <div class="line">${lineName || "пусто"}</div>
+`;
 
           div.addEventListener("click", () => showDetails(position, cell));
           grid.appendChild(div);
