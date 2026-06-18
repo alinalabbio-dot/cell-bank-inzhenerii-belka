@@ -84,14 +84,14 @@
     const SUPABASE_URL = "https://tiqxoskgsycmfksdzied.supabase.co";
     const SUPABASE_KEY = "sb_publishable_5bQuy5ehLlD21EcWwx1j1w_-q_V1Qrg";
 
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     const boxId = 1;
     const rowLabels = ["A", "B", "C", "D", "E", "F", "G", "H", "J"];
     const columns = [1,2,3,4,5,6,7,8,9,10];
 
     async function loadBox() {
-      const { data: box, error: boxError } = await supabase
+      const { data: box, error: boxError } = await supabaseClient
         .from("boxes")
         .select("*")
         .eq("id", boxId)
@@ -106,7 +106,7 @@
       document.getElementById("boxTitle").textContent =
         `${box.name} — ${box.description || ""}`;
 
-      const { data: cells, error: cellsError } = await supabase
+      const { data: cells, error: cellsError } = await supabaseClient
         .from("box_cells")
         .select(`
           *,
