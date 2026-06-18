@@ -3,9 +3,183 @@
 <head>
   <meta charset="UTF-8" />
   <title>Банк клеточных линий</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 24px;
+      background: #f6f7f9;
+    }
+
+    h1 {
+      margin-bottom: 8px;
+    }
+
+    .box-title {
+      margin-bottom: 20px;
+      color: #444;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 40px repeat(10, 120px);
+      gap: 4px;
+      align-items: stretch;
+    }
+
+    .header, .row-label, .cell {
+      border: 1px solid #ccc;
+      background: white;
+      padding: 6px;
+      min-height: 70px;
+      font-size: 13px;
+      box-sizing: border-box;
+    }
+
+    .header, .row-label {
+      font-weight: bold;
+      text-align: center;
+      background: #e9edf3;
+      min-height: 32px;
+    }
+
+    .cell.empty {
+      background: #ffffff;
+      color: #bbb;
+    }
+
+    .cell.frozen {
+      background: #dcefd6;
+    }
+
+    .cell.taken {
+      background: #ffe0b2;
+    }
+
+    .position {
+      font-weight: bold;
+      font-size: 12px;
+      margin-bottom: 4px;
+      color: #555;
+    }
+
+    .line {
+      font-weight: bold;
+    }
+
+    .meta {
+      font-size: 11px;
+      margin-top: 4px;
+      color: #444;
+      white-space: pre-line;
+    }
+  </style>
 </head>
 <body>
   <h1>Банк клеточных линий</h1>
-  <p>Первый прототип работает.</p>
+  <div class="box-title" id="boxTitle">Загрузка...</div>
+  <div id="grid" class="grid"></div>
+
+  <script>
+    const SUPABASE_URL = "https://tiqxoskgsycmfksdzied.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_5bQuy5ehLlD21EcWwx1j1w_-q_V1Qrg";
+
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const boxId = 1;
+    const rowLabels = ["A", "B", "C", "D", "E", "F", "G", "H", "J"];
+    const columns = [1,2,3,4,5,6,7,8,9,10];
+
+    async function loadBox() {
+      const { data: box, error: boxError } = await supabase
+        .from("boxes")
+        .select("*")
+        .eq("id", boxId)
+        .single();
+
+      if (boxError) {
+        document.getElementById("boxTitle").textContent = "Ошибка загрузки коробки";
+        console.error(boxError);
+        return;
+      }
+
+      document.getElementById("boxTitle").textContent =
+        `${box.name} — ${box.description || ""}`;
+
+      const { data: cells, error: cellsError } = await supabase
+        .from("box_cells")
+        .select(`
+          *,
+          cell_lines (
+            name
+          )
+        `)
+        .eq("box_id", boxId);
+
+      if (cellsError) {
+        document.getElementById("grid").textContent = "Ошибка загрузки ячеек";
+        console.error(cellsError);
+        return;
+      }
+
+      renderGrid(cells || []);
+    }
+
+    function renderGrid(cells) {
+      const grid = document.getElementById("grid");
+      grid.innerHTML = "";
+
+      const byPosition = {};
+      cells.forEach(cell => {
+        byPosition[cell.position] = cell;
+      });
+
+      grid.appendChild(makeHeader(""));
+      columns.forEach(col => grid.appendChild(makeHeader(col)));
+
+      rowLabels.forEach(row => {
+        grid.appendChild(makeRowLabel(row));
+
+        columns.forEach(col => {
+          const position = `${row}${col}`;
+          const cell = byPosition[position];
+
+          const div = document.createElement("div");
+          div.className = "cell " + (cell?.status || "empty");
+
+          const lineName = cell?.cell_lines?.name || "";
+
+          div.innerHTML = `
+            <div class="position">${position}</div>
+            <div class="line">${lineName || "пусто"}</div>
+            <div class="meta">
+              ${cell?.source_or_origin ? "Источник: " + cell.source_or_origin : ""}
+              ${cell?.frozen_by ? "\nЗаморозил: " + cell.frozen_by : ""}
+              ${cell?.frozen_date ? "\nДата: " + cell.frozen_date : ""}
+              ${cell?.passage ? "\nПассаж: " + cell.passage : ""}
+            </div>
+          `;
+
+          grid.appendChild(div);
+        });
+      });
+    }
+
+    function makeHeader(text) {
+      const div = document.createElement("div");
+      div.className = "header";
+      div.textContent = text;
+      return div;
+    }
+
+    function makeRowLabel(text) {
+      const div = document.createElement("div");
+      div.className = "row-label";
+      div.textContent = text;
+      return div;
+    }
+
+    loadBox();
+  </script>
 </body>
 </html>
